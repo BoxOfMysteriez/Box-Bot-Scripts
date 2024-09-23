@@ -7,3 +7,5 @@ Huge credit to DoktorSAS for creating the initial script and Kalitos for helping
 By default the server will fill with the maximum amount of bots (18). You can change the amount of bots that auto-connect to your server, along with how many spawn at once, under the serverBotFill function. Difficulty can be changed with the setDiffBots function near the bottom of the file. 
 
 Known Issue: On round based modes (such as SnD), extra bots will be added on the start of a new round if the server is not full. 
+
+Setting party_maxplayers in your server config *should* override the amount of bots that appear, also potentially fixing the issue listed above 
