@@ -7,7 +7,8 @@ Updated for S1X v0.0.3 with COOP support and veteran difficulty
 
 This version uses S1X v0.0.3 compatible functions:
 - spawnBots(count)
-- kickBot()
+- kickBot(player)
+- Bot_difficulty_default()
 - Detects COOP mode and uses separate target player counts
 - Sets bot difficulty to "veteran" for both COOP and multiplayer
 */
@@ -156,8 +157,8 @@ setDiffBots()
 			else
 				difficulty = level.autobots_mpDifficulty;
 
-			// Set the difficulty using the base bot utility function
-			player maps/mp/bots/_bots_util::_id_16EB(difficulty, undefined);
+			// Set the difficulty using S1X v0.0.3 function
+			Bot_difficulty_default(difficulty);
 		}
 	}
 }
