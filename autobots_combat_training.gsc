@@ -1,212 +1,163 @@
-// Combat-training-aware autobots script for S1X
-// Bot scripts for S1x and H1-Mod for use on dedicated servers
-// Updated: added Combat Training handling (fills to smaller size, don't kick bots on human join)
-// Keep the rest of your mod/API calls (spawn_bots, bot_drop, getguid, etc.)
-
 #include maps/mp/bots/_bots;
 
-/*
- Mod: Autobots (Combat Training aware)
- Updated to S1X-compatible style
- - Auto-detects Combat Training (best-effort). You can also force it via config below.
- - In Combat Training: fill to a smaller match size, do NOT kick bots when a human joins.
- - In normal server mode: previous behavior (fill up to 18, kick bots when human joins to make space).
-*/
-
-////////////////////////////////////////////////////////////////////////////////
-// CONFIG
-////////////////////////////////////////////////////////////////////////////////
-// Force combat training mode. If null/false, the script will try to auto-detect.
 combatTrainingForce = true;
-
-// Combat Training target player count (smaller than full-server dedicated matches)
 combatTrainingMaxPlayers = 12;
-
-// Dedicated-server target player count (original behavior)
 dedicatedMaxPlayers = 18;
 
-// Default bot difficulty
 defaultBotDifficulty = "veteran";
+defaultBotLevel = 55;
 
-////////////////////////////////////////////////////////////////////////////////
-// Initialization
-////////////////////////////////////////////////////////////////////////////////
+// Enable/disable debug logs
+debugAutobots = true;
 
 init()
 {
-    // decide mode early, so other threads can read the flag
     if (!combatTrainingForce)
         level.combatTraining = detectCombatTraining();
     else
         level.combatTraining = true;
+
+    dbg("init() combatTraining=" + level.combatTraining);
 
     level thread onPlayerConnect();
     level thread serverBotFill();
     level thread setDiffBots();
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Try to auto-detect Combat Training (best-effort).
-// If your S1X build exposes a clear gametype or mapname for combat training,
-// this helper will pick it up. If detection fails, set combatTrainingForce = true.
 detectCombatTraining()
 {
-    // best-effort checks: look for "combat" or "training" in gametype or mapname
-    if (level)
+    if (isDefined(level.gametype))
     {
-        if (level.gametype)
+        if (isSubStr(level.gametype, "combat") || isSubStr(level.gametype, "training"))
         {
-            if (isSubStr(level.gametype, "combat") || isSubStr(level.gametype, "training"))
-                return true;
-        }
-
-        if (level.mapname)
-        {
-            if (isSubStr(level.mapname, "combat") || isSubStr(level.mapname, "training"))
-                return true;
+            dbg("detectCombatTraining(): matched gametype=" + level.gametype);
+            return true;
         }
     }
 
-    // fallback: if there is only one local player and not a networked server,
-    // some builds may indicate offline mode by level.localplayer or similar;
-    // we leave this conservative — allow manual override via combatTrainingForce.
+    if (isDefined(level.mapname))
+    {
+        if (isSubStr(level.mapname, "combat") || isSubStr(level.mapname, "training"))
+        {
+            dbg("detectCombatTraining(): matched mapname=" + level.mapname);
+            return true;
+        }
+    }
+
+    dbg("detectCombatTraining(): no match, default false");
     return false;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Player connect / join handling
-////////////////////////////////////////////////////////////////////////////////
 
 onPlayerConnect()
 {
     level endon("game_ended");
+
     for (;;)
     {
         level waittill("connected", player);
+        dbg("connected guid=" + player getguid() + " isBot=" + (player isBot()));
 
-        // If running Combat Training, we do not kick bots when a human joins.
-        // Otherwise keep original behavior: if a human connected, kick a bot to make space.
-        if (!level.combatTraining && !player isBot())
+        if (player isBot())
         {
-            player thread kickBotOnJoin();
+            player setBotDifficulty(defaultBotDifficulty);
+            player applyBotPrestigeSetting();
+        }
+        else if (!level.combatTraining)
+        {
+            dbg("human connected in dedicated mode -> kickBotForHumanJoin()");
+            player thread kickBotForHumanJoin();
+        }
+        else
+        {
+            dbg("human connected in combat training mode -> no bot kick");
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// isBot helper (S1X-friendly)
-////////////////////////////////////////////////////////////////////////////////
 isBot()
 {
     return isSubStr(self getguid(), "bot");
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Server fill thread: fills up to a mode-dependent target
-////////////////////////////////////////////////////////////////////////////////
 serverBotFill()
 {
     level endon("game_ended");
     level waittill("connected", player);
+    dbg("serverBotFill() started");
 
-    // determine fill target based on mode
     for (;;)
     {
-        target = (level.combatTraining) ? combatTrainingMaxPlayers : dedicatedMaxPlayers;
+        target = level.combatTraining ? combatTrainingMaxPlayers : dedicatedMaxPlayers;
 
-        while (level.players.size < target && !level.gameended)
+        if (level.players.size < target)
+            dbg("fill loop: players=" + level.players.size + " target=" + target);
+
+        while (level.players.size < target)
         {
-            // spawn a small batch so spawn_bots helper can handle team/autoassign behavior
+            dbg("spawning 4 bots...");
             self spawnBots(4);
             wait 1;
         }
 
-        // In dedicated-server mode, if humans fill the lobby and there are still bots,
-        // kick bots to make room for humans (original behavior).
         if (!level.combatTraining)
         {
-            if (level.players.size >= target && contBots() > 0)
-                kickbot();
+            if (level.players.size >= target && countBots() > 0)
+            {
+                dbg("dedicated trim: players=" + level.players.size + " bots=" + countBots() + " -> kickOneBot()");
+                kickOneBot();
+            }
         }
 
-        // In Combat Training mode we intentionally don't kick bots when a human joins.
         wait 0.05;
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Count bots currently in the level
-////////////////////////////////////////////////////////////////////////////////
-contBots()
+countBots()
 {
     bots = 0;
     foreach (player in level.players)
     {
         if (player isBot())
-        {
             bots++;
-        }
     }
     return bots;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Spawn helper that delegates to base mod/API function
-////////////////////////////////////////////////////////////////////////////////
 spawnBots(a)
 {
-    // Use the project's provided spawn helper (preserves team/autoassign behavior):
-    spawn_bots(a, "autoassign"); // spawnbots(n, team);
+    spawn_bots(a, "autoassign");
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Kick a bot (legacy helper)
-////////////////////////////////////////////////////////////////////////////////
-kickbot()
+kickOneBot()
 {
     level endon("game_ended");
     foreach (player in level.players)
     {
         if (player isBot())
         {
-            player bot_drop(); // bot_drop();
+            dbg("kickOneBot(): dropping bot guid=" + player getguid());
+            player bot_drop();
             break;
         }
     }
 }
 
-kickBotOnJoin()
+kickBotForHumanJoin()
 {
-    level endon("game_ended");
-    foreach (player in level.players)
-    {
-        if (player isBot())
-        {
-            player bot_drop(); // bot_drop();
-            break;
-        }
-    }
+    dbg("kickBotForHumanJoin()");
+    kickOneBot();
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Bot difficulty assignment
-////////////////////////////////////////////////////////////////////////////////
-/*
-Set Bot difficulty below with the setDiffBots function
-Level 1 - 2 "recruit"
-Level 17 - 25 "regular"
-Level 37 - 44 "hardened"
-Level 47 - 50 with Prestige - "veteran"
-*/
 setDiffBots()
 {
+    level endon("game_ended");
+
     for (;;)
     {
         level waittill("connected", player);
-        // Apply difficulty only to bot entities
         if (player isBot())
         {
-            // Apply the configured default difficulty (veteran)
+            dbg("setDiffBots(): applying difficulty=" + defaultBotDifficulty + " guid=" + player getguid());
             player setBotDifficulty(defaultBotDifficulty);
         }
     }
@@ -214,7 +165,6 @@ setDiffBots()
 
 setBotDifficulty(difficulty)
 {
-    // 'self' = the bot player entity
     switch (difficulty)
     {
         case "regular":
@@ -223,19 +173,21 @@ setBotDifficulty(difficulty)
             self.maxHealth = 100;
             self.botAggression = 0.5;
             break;
+
         case "hardened":
             self.botAccuracy = 0.9;
             self.reactionTime = 0.2;
             self.maxHealth = 150;
             self.botAggression = 0.8;
             break;
+
         case "veteran":
-            // Stronger, faster, more aggressive bots for veteran difficulty
             self.botAccuracy = 0.98;
             self.reactionTime = 0.12;
             self.maxHealth = 200;
             self.botAggression = 0.9;
             break;
+
         default:
             self.botAccuracy = 0.6;
             self.reactionTime = 0.5;
@@ -243,5 +195,84 @@ setBotDifficulty(difficulty)
             self.botAggression = 0.5;
             break;
     }
+
     self.health = self.maxHealth;
+    dbg("setBotDifficulty(): " + difficulty + " health=" + self.health + " guid=" + self getguid());
+}
+
+applyBotPrestigeSetting()
+{
+    prestigeMode = -2;
+
+    // NOTE: if getDvarInt is unavailable in your build, this line will error.
+    // Replace with your engine's dvar function if needed.
+    prestigeMode = getDvarInt("bots_main_prestige");
+
+    dbg("applyBotPrestigeSetting(): mode=" + prestigeMode + " guid=" + self getguid());
+
+    if (prestigeMode == -1)
+    {
+        hostPrestige = getHostPrestige();
+        dbg("prestige mode -1 -> hostPrestige=" + hostPrestige);
+        self setBotPrestige(hostPrestige);
+    }
+    else if (prestigeMode == -2)
+    {
+        r = randomInt(16); // 0..15
+        dbg("prestige mode -2 -> randomPrestige=" + r);
+        self setBotPrestige(r);
+    }
+    else
+    {
+        if (prestigeMode < 0)
+            prestigeMode = 0;
+        if (prestigeMode > 15)
+            prestigeMode = 15;
+
+        dbg("prestige fixed -> " + prestigeMode);
+        self setBotPrestige(prestigeMode);
+    }
+}
+
+getHostPrestige()
+{
+    foreach (p in level.players)
+    {
+        if (!(p isBot()))
+        {
+            if (isDefined(p.prestige))
+                return p.prestige;
+
+            if (isDefined(p.pers) && isDefined(p.pers["prestige"]))
+                return p.pers["prestige"];
+
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
+setBotPrestige(prestige)
+{
+    self.prestige = prestige;
+
+    if (!isDefined(self.pers))
+        self.pers = [];
+
+    self.pers["prestige"] = prestige;
+    self.rank = defaultBotLevel;
+    self.pers["rank"] = defaultBotLevel;
+
+    dbg("setBotPrestige(): prestige=" + prestige + " rank=" + defaultBotLevel + " guid=" + self getguid());
+}
+
+dbg(msg)
+{
+    if (!debugAutobots)
+        return;
+
+    // try both common outputs depending on build
+    iprintln("^2[Autobots]^7 " + msg);
+    println("[Autobots] " + msg);
 }
