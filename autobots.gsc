@@ -8,9 +8,9 @@ Updated for S1X v0.0.3 with COOP support and veteran difficulty
 This version uses S1X v0.0.3 compatible functions:
 - spawnBots(count)
 - kickBot(player)
-- Bot_difficulty_default()
+- Bot_difficulty_default(3) for veteran difficulty
 - Detects COOP mode and uses separate target player counts
-- Sets bot difficulty to "veteran" for both COOP and multiplayer
+- Sets bot difficulty to veteran (level 3) for both COOP and multiplayer
 */
 
 #include maps/mp/bots/_bots;
@@ -20,8 +20,6 @@ This version uses S1X v0.0.3 compatible functions:
 //
 level.autobots_mpTargetPlayers = 18;   // target players for multiplayer
 level.autobots_coopTargetPlayers = 6;  // target players for COOP
-level.autobots_coopDifficulty = "veteran";
-level.autobots_mpDifficulty = "veteran";
 
 init()
 {
@@ -139,10 +137,11 @@ kickBotOnJoin()
 
 /*
 Set Bot difficulty with setDiffBots function
-Level 1 - 2 "recruit"
-Level 17 - 25 "regular"
-Level 37 - 44 "hardened"
-Level 47 - 50 with Prestige - "veteran"
+Difficulty levels:
+0 - "recruit"
+1 - "regular"
+2 - "hardened"
+3 - "veteran"
 */
 setDiffBots()
 {
@@ -151,14 +150,8 @@ setDiffBots()
 		level waittill("connected", player);
 		if (player isentityabot())
 		{
-			// Determine difficulty based on game mode
-			if (isCoopMode())
-				difficulty = level.autobots_coopDifficulty;
-			else
-				difficulty = level.autobots_mpDifficulty;
-
-			// Set the difficulty using S1X v0.0.3 function
-			Bot_difficulty_default(difficulty);
+			// Set difficulty to veteran (3) for all bots
+			Bot_difficulty_default(3);
 		}
 	}
 }
