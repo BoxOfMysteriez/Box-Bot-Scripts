@@ -21,7 +21,8 @@ init()
 
     level thread onPlayerConnect();
     level thread serverBotFill();
-    level thread setDiffBots();
+    level thread liveDebugHeartbeat(); // <-- add this
+    // Removed duplicate bot difficulty thread (setDiffBots)
 }
 
 detectCombatTraining()
@@ -65,7 +66,7 @@ onPlayerConnect()
         else if (!level.combatTraining)
         {
             dbg("human connected in dedicated mode -> kickBotForHumanJoin()");
-            player thread kickBotForHumanJoin();
+            kickBotForHumanJoin();
         }
         else
         {
@@ -76,6 +77,8 @@ onPlayerConnect()
 
 isBot()
 {
+    // Keep this for compatibility with your current build.
+    // Replace with engine-native bot flag check if available.
     return isSubStr(self getguid(), "bot");
 }
 
@@ -88,27 +91,30 @@ serverBotFill()
     for (;;)
     {
         target = level.combatTraining ? combatTrainingMaxPlayers : dedicatedMaxPlayers;
+        total = level.players.size;
 
-        if (level.players.size < target)
-            dbg("fill loop: players=" + level.players.size + " target=" + target);
+        if (total < target)
+            dbg("fill loop: players=" + total + " target=" + target);
 
+        // Spawn gradually to avoid overshoot/spawn storms
         while (level.players.size < target)
         {
-            dbg("spawning 4 bots...");
-            self spawnBots(4);
-            wait 1;
+            dbg("spawning 1 bot...");
+            spawnBots(1);
+            wait 0.25;
         }
 
         if (!level.combatTraining)
         {
-            if (level.players.size >= target && countBots() > 0)
+            // Trim only if above target, not when equal
+            if (level.players.size > target && countBots() > 0)
             {
-                dbg("dedicated trim: players=" + level.players.size + " bots=" + countBots() + " -> kickOneBot()");
+                dbg("dedicated trim: players=" + level.players.size + " target=" + target + " bots=" + countBots() + " -> kickOneBot()");
                 kickOneBot();
             }
         }
 
-        wait 0.05;
+        wait 0.25;
     }
 }
 
@@ -131,13 +137,14 @@ spawnBots(a)
 kickOneBot()
 {
     level endon("game_ended");
+
     foreach (player in level.players)
     {
         if (player isBot())
         {
             dbg("kickOneBot(): dropping bot guid=" + player getguid());
             player bot_drop();
-            break;
+            return; // explicitly exit after one kick
         }
     }
 }
@@ -148,20 +155,7 @@ kickBotForHumanJoin()
     kickOneBot();
 }
 
-setDiffBots()
-{
-    level endon("game_ended");
-
-    for (;;)
-    {
-        level waittill("connected", player);
-        if (player isBot())
-        {
-            dbg("setDiffBots(): applying difficulty=" + defaultBotDifficulty + " guid=" + player getguid());
-            player setBotDifficulty(defaultBotDifficulty);
-        }
-    }
-}
+// Removed setDiffBots() - logic already handled in onPlayerConnect()
 
 setBotDifficulty(difficulty)
 {
@@ -202,11 +196,7 @@ setBotDifficulty(difficulty)
 
 applyBotPrestigeSetting()
 {
-    prestigeMode = -2;
-
-    // NOTE: if getDvarInt is unavailable in your build, this line will error.
-    // Replace with your engine's dvar function if needed.
-    prestigeMode = getDvarInt("bots_main_prestige");
+    prestigeMode = getPrestigeModeSafe();
 
     dbg("applyBotPrestigeSetting(): mode=" + prestigeMode + " guid=" + self getguid());
 
@@ -232,6 +222,18 @@ applyBotPrestigeSetting()
         dbg("prestige fixed -> " + prestigeMode);
         self setBotPrestige(prestigeMode);
     }
+}
+
+getPrestigeModeSafe()
+{
+    // Default behavior: random prestige
+    mode = -2;
+
+    // If your build supports getDvarInt, this works.
+    // If it doesn't, replace this function with your engine's dvar read API.
+    mode = getDvarInt("bots_main_prestige");
+
+    return mode;
 }
 
 getHostPrestige()
@@ -265,6 +267,35 @@ setBotPrestige(prestige)
     self.pers["rank"] = defaultBotLevel;
 
     dbg("setBotPrestige(): prestige=" + prestige + " rank=" + defaultBotLevel + " guid=" + self getguid());
+}
+
+liveDebugHeartbeat()
+{
+    level endon("game_ended");
+
+    for (;;)
+    {
+        humans = 0;
+        bots = 0;
+
+        foreach (p in level.players)
+        {
+            if (p isBot())
+                bots++;
+            else
+                humans++;
+        }
+
+        target = level.combatTraining ? combatTrainingMaxPlayers : dedicatedMaxPlayers;
+
+        dbg("LIVE mode=" + (level.combatTraining ? "combat" : "dedicated")
+            + " total=" + level.players.size
+            + " humans=" + humans
+            + " bots=" + bots
+            + " target=" + target);
+
+        wait 1.0; // print once per second
+    }
 }
 
 dbg(msg)
