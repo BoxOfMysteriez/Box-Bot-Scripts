@@ -231,10 +231,10 @@ setBotDifficulty(difficulty)
             break;
         case "veteran":
             // Stronger, faster, more aggressive bots for veteran difficulty
-            self.botAccuracy = 0.9;
-            self.reactionTime = 0.2;
+            self.botAccuracy = 0.98;
+            self.reactionTime = 0.12;
             self.maxHealth = 200;
-            self.botAggression = 0.8;
+            self.botAggression = 0.9;
             break;
         default:
             self.botAccuracy = 0.6;
