@@ -1,15 +1,15 @@
 /*
-Mod: Autobots - Fixed & Enhanced
+Mod: Autobots - S1X v0.0.3 Compatible
 Originally Developed by DoktorSAS
 Difficulty Addition By Kalitos
 Tested by BoxOfMysteriez
-Updated with COOP support and veteran difficulty
+Updated for S1X v0.0.3 with COOP support and veteran difficulty
 
-This version:
+This version uses S1X v0.0.3 compatible functions:
+- spawnBots(count)
+- kickBot()
 - Detects COOP mode and uses separate target player counts
 - Sets bot difficulty to "veteran" for both COOP and multiplayer
-- Maintains compatibility with S1X bot functions
-- Includes proper error handling
 */
 
 #include maps/mp/bots/_bots;
@@ -77,14 +77,14 @@ serverBotFill()
 		// Spawn bots until we reach target
 		while (level.players.size < target && !level.gameended)
 		{
-			self spawnBots(11);
+			spawnBots(11);
 			wait 1;
 		}
 
 		// Kick bots if we exceed target
 		if (level.players.size > target && contBots() > 0)
 		{
-			kickbot();
+			kickBotNow();
 		}
 
 		wait 0.05;
@@ -104,19 +104,14 @@ contBots()
 	return bots;
 }
 
-spawnBots(a)
-{
-	spawn_bots(a, "autoassign");
-}
-
-kickbot()
+kickBotNow()
 {
 	level endon("game_ended");
 	foreach (player in level.players)
 	{
 		if (player isentityabot())
 		{
-			player bot_drop();
+			kickBot(player);
 			break;
 		}
 	}
@@ -135,7 +130,7 @@ kickBotOnJoin()
 	{
 		if (player isentityabot())
 		{
-			player bot_drop();
+			kickBot(player);
 			break;
 		}
 	}
