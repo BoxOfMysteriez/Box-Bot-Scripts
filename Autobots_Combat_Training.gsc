@@ -25,7 +25,7 @@ combatTrainingForce = true;
 combatTrainingMaxPlayers = 12;
 dedicatedMaxPlayers = 18;
 
-defaultBotDifficulty = "expert";     // now supports: regular, hardened, veteran, expert, pro
+defaultBotDifficulty = "pro";     // now supports: regular, hardened, veteran, expert, pro
 defaultBotLevel = 55;
 
 // AW-style knobs
@@ -398,7 +398,7 @@ setBotDifficulty(difficulty)
 
     guid = "unknown";
     if (isDefined(self getguid()))
-        guid = self getguid();
+        guid = self.getguid();
 
     dbg("setBotDifficulty(): " + difficulty
         + " acc=" + self.botAccuracy
