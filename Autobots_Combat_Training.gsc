@@ -25,7 +25,7 @@ combatTrainingForce = true;
 combatTrainingMaxPlayers = 12;
 dedicatedMaxPlayers = 18;
 
-defaultBotDifficulty = "expert";     // now supports: regular, hardened, veteran, expert
+defaultBotDifficulty = "expert";     // now supports: regular, hardened, veteran, expert, pro
 defaultBotLevel = 55;
 
 // AW-style knobs
@@ -329,6 +329,13 @@ setBotDifficulty(difficulty)
                 self.botAggression = 1.00;
                 break;
 
+            case "pro":
+                self.botAccuracy = 1.00;
+                self.reactionTime = 0.03;
+                self.maxHealth = 185;
+                self.botAggression = 1.00;
+                break;
+
             default:
                 self.botAccuracy = 0.68;
                 self.reactionTime = 0.35;
@@ -367,6 +374,13 @@ setBotDifficulty(difficulty)
                 self.botAccuracy = 1.00;
                 self.reactionTime = 0.08;
                 self.maxHealth = 225;
+                self.botAggression = 1.00;
+                break;
+
+            case "pro":
+                self.botAccuracy = 1.00;
+                self.reactionTime = 0.04;
+                self.maxHealth = 250;
                 self.botAggression = 1.00;
                 break;
 
