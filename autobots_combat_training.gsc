@@ -194,9 +194,9 @@ setBotDifficulty(difficulty)
 
         case "veteran":
             self.botAccuracy = 0.98;
-            self.reactionTime = 0.12;
+            self.reactionTime = 0.98;
             self.maxHealth = 200;
-            self.botAggression = 0.9;
+            self.botAggression = 0.98;
             break;
 
         default:
