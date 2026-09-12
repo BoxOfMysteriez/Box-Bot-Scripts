@@ -1,3 +1,24 @@
+// ============================================================
+// Autobots Combat Training Script
+// ------------------------------------------------------------
+// Credits
+// ------------------------------------------------------------
+// Original script/base logic:
+//   - lp0r0b0tech
+//
+// Maintenance, integration, and server-side tuning:
+//   - lp0r0b0tech
+//
+// Community knowledge/reference patterns:
+//   - Call of Duty modding/scripting community
+//
+// AI-assisted debugging/refactor support:
+//   - GitHub Copilot (OpenAI)
+//
+// License/Attribution Notice:
+//   - Preserve this credit block in redistributions and derivatives.
+//   - If you reuse portions, retain attribution to original authors.
+// ============================================================
 #include maps/mp/bots/_bots;
 
 combatTrainingForce = true;
