@@ -1,0 +1,107 @@
+*** Begin Patch
+*** Update File: maps/mp/bots/_bots_autobots_combat_training.gsc
+@@
+ init()
+ {
+@@
+     if (sanityTestDuration < 5.0) sanityTestDuration = 5.0;
+     if (sanityTestSampleInterval < 1.0) sanityTestSampleInterval = 1.0;
+ 
++    // Startup guard: prevent duplicate long-running threads if init() is called more than once.
++    if (isDefined(level.autobots_started) && level.autobots_started)
++    {
++        dbg("init(): already started, skipping duplicate thread startup");
++        return;
++    }
++    level.autobots_started = true;
++
+     if (!combatTrainingForce) level.combatTraining = detectCombatTraining();
+     else level.combatTraining = true;
+@@
+ applyAutobotDifficulty(diff)
+ {
+     if (!isDefined(self.pers)) self.pers = [];
+     applied = normalizeDifficultyName(diff);
+     self.pers["autobot_diff_applied"] = applied;
+ 
+     self setBotDifficulty(applied);
+     applyOpLoadout(self);
+ }
+ 
++applyAutobotDifficultyMinimal(diff)
++{
++    if (!isDefined(self.pers)) self.pers = [];
++    applied = normalizeDifficultyName(diff);
++    self.pers["autobot_diff_applied"] = applied;
++
++    // Difficulty-only enforcement path: no weapon/rank/prestige churn.
++    self setBotDifficulty(applied);
++}
++
++applyAutobotProvisioning()
++{
++    self setBotRankCompat(defaultBotLevel);
++    self applyBotPrestigeSetting();
++    applyOpLoadout(self);
++
++    if (awHealthRegenOnSpawn) safeFullHeal(self);
++}
++
+ applyDifficultyToAllBots(forceWritePers)
+ {
+     appliedCount = 0;
+     expected = normalizeDifficultyName(lockedBotDifficulty);
+ 
+@@
+     {
+         if (!isDefined(p) || !(p isBotEntity())) continue;
+ 
+-        p applyAutobotDifficulty(expected);
+-        p setBotRankCompat(defaultBotLevel);
+-        p applyBotPrestigeSetting();
+-
+         if (!isDefined(p.pers)) p.pers = [];
+-        if (forceWritePers || !isDefined(p.pers["autobot_diff_applied"]) || p.pers["autobot_diff_applied"] != expected)
+-            p.pers["autobot_diff_applied"] = expected;
+-
+-        if (awHealthRegenOnSpawn) safeFullHeal(p);
++        needsDiffWrite = (forceWritePers
++            || !isDefined(p.pers["autobot_diff_applied"])
++            || p.pers["autobot_diff_applied"] != expected);
++
++        if (forceWritePers)
++        {
++            // Full onboarding/provisioning path.
++            p applyAutobotDifficulty(expected);
++            p applyAutobotProvisioning();
++        }
++        else if (needsDiffWrite)
++        {
++            // Delta path for periodic enforcement.
++            p applyAutobotDifficultyMinimal(expected);
++        }
++
+         appliedCount++;
+     }
+@@
+ onPlayerConnect()
+ {
+@@
+         if (bot)
+         {
+-            player applyAutobotDifficulty(lockedBotDifficulty);
+-            player setBotRankCompat(defaultBotLevel);
+-            player applyBotPrestigeSetting();
+-
+-            if (!isDefined(player.pers)) player.pers = [];
+-            player.pers["autobot_diff_applied"] = normalizeDifficultyName(lockedBotDifficulty);
+-
+-            if (awHealthRegenOnSpawn) safeFullHeal(player);
++            player applyAutobotDifficulty(lockedBotDifficulty);
++            player applyAutobotProvisioning();
+         }
+         else if (!level.combatTraining)
+         {
+             trimBotsToTarget();
+         }
+*** End Patch
